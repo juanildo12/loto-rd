@@ -15,6 +15,8 @@ export async function POST(request: Request) {
 
     console.log(`Scraping results for ${year}-${month}...`);
     const results = await scrapeAllResults(year, month);
+    
+    console.log(`Found ${results.length} results`);
 
     let imported = 0;
     let skipped = 0;
@@ -42,7 +44,8 @@ export async function POST(request: Request) {
           },
         });
         imported++;
-      } catch {
+      } catch (err) {
+        console.error('Error importing:', err);
         skipped++;
       }
     }
@@ -52,11 +55,12 @@ export async function POST(request: Request) {
       imported,
       skipped,
       total: results.length,
+      sample: results.slice(0, 2),
     });
   } catch (error) {
     console.error('Error scraping:', error);
     return NextResponse.json(
-      { error: 'Failed to scrape results' },
+      { error: 'Failed to scrape results', details: String(error) },
       { status: 500 }
     );
   }
