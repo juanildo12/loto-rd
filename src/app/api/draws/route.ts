@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import type { GameType } from '@/types/loto';
-import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
   try {
+    // Debug: log the database URL (masked)
+    const dbUrl = process.env.DATABASE_URL || 'NOT SET';
+    const maskedUrl = dbUrl.replace(/:([^@]+)@/, ':***@');
+    console.log('DATABASE_URL:', maskedUrl);
+    
     const { searchParams } = new URL(request.url);
     const gameType = searchParams.get('gameType') as GameType | null;
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -22,11 +26,14 @@ export async function GET(request: Request) {
       numbers: typeof draw.numbers === 'string' ? JSON.parse(draw.numbers) : draw.numbers,
     }));
 
-    return NextResponse.json(formatedDraws);
+    return NextResponse.json({
+      draws: formatedDraws,
+      debug: { dbUrl: maskedUrl, count: draws.length }
+    });
   } catch (error) {
     console.error('Error fetching draws:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch draws' },
+      { error: 'Failed to fetch draws', details: String(error) },
       { status: 500 }
     );
   }
@@ -71,7 +78,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating draw:', error);
     return NextResponse.json(
-      { error: 'Failed to create draw' },
+      { error: 'Failed to create draw', details: String(error) },
       { status: 500 }
     );
   }
