@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LOTO RD - Aplicación de Análisis Estadístico
 
-## Getting Started
+Aplicación web para analizar los sorteos del Loto de LEIDSA (República Dominicana).
 
-First, run the development server:
+## Características
+
+- 📊 **Estadísticas**: Frecuencia de números, números calientes/fríos, distribución pares/impares
+- 🎲 **Generador**: Genera combinaciones basadas en estrategias (aleatorio, números frecuentes, etc.)
+- 📋 **Resultados**: Historial de sorteos con filtro por tipo de juego
+- 🔄 **Scraping**: Actualización de datos desde yelu.do
+
+## Tecnologías
+
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- Prisma + SQLite (desarrollo) / PostgreSQL (producción)
+- Recharts (gráficos)
+
+## Inicio Rápido
 
 ```bash
+# 1. Instalar dependencias
+npm install
+
+# 2. Generar cliente de Prisma y crear base de datos
+npx prisma generate
+npx prisma db push
+
+# 3. Iniciar el servidor
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La app estará en http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuración
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Desarrollo (SQLite - sin instalación)
+Ya configurado por defecto. La base de datos se crea automáticamente en `prisma/dev.db`
 
-## Learn More
+### Producción (PostgreSQL)
+1. Crea una cuenta gratuita en [Neon](https://neon.com) o [Supabase](https://supabase.com)
+2. Actualiza `prisma/schema.prisma`:
 
-To learn more about Next.js, take a look at the following resources:
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Actualiza el archivo `.env`:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```env
+DATABASE_URL="postgresql://user:password@host:5432/database"
+```
 
-## Deploy on Vercel
+4. Regenera y haz push:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Uso
+
+1. **Importar datos**: Ve a `/resultados` y haz clic en "Actualizar" para scrapear datos de yelu.do
+2. **Ver estadísticas**: Navega a `/estadisticas` para ver gráficos y análisis
+3. **Generar números**: Usa `/generador` para crear combinaciones
+
+## Despliegue en Vercel
+
+1. Sube el proyecto a GitHub
+2. Crea un proyecto en [Vercel](https://vercel.com)
+3. Conecta tu repositorio
+4. Agrega la variable de entorno `DATABASE_URL` (usando Neon o Supabase)
+5. Deploy automático
+
+## Estructura del Proyecto
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── draws/       # API de sorteos
+│   │   ├── scrape/      # API de scraping
+│   │   ├── stats/      # API de estadísticas
+│   │   └── generate/   # API de generación
+│   ├── resultados/      # Página de resultados
+│   ├── estadisticas/   # Página de estadísticas
+│   └── generador/      # Página del generador
+├── components/         # Componentes React
+├── lib/
+│   ├── db.ts           # Conexión a Prisma
+│   ├── scraper.ts     # Lógica de scraping
+│   └── statistics.ts   # Funciones estadísticas
+└── types/              # Tipos TypeScript
+```
+
+## Juegos Soportados
+
+| Juego | Números | Bono |
+|-------|---------|------|
+| Loto | 6 del 1-40 | - |
+| MAS | 6 del 1-40 | 1 del 1-12 |
+| Supermas | 6 del 1-40 | 2 Bonos (1-12, 1-15) |
+
+## Nota Legal
+
+Esta aplicación es solo para fines informativos y de entretenimiento. 
+Las loterías son juegos de azar. No garantizamos ganancias.
