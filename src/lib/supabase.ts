@@ -11,6 +11,7 @@ export const getDraws = async (gameType?: string, limit = 50) => {
     headers: {
       'Content-Type': 'application/json',
       'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
     },
   });
   
@@ -33,6 +34,7 @@ export const createDraw = async (draw: {
     headers: {
       'Content-Type': 'application/json',
       'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Prefer': 'resolution=merge-duplicates',
     },
     body: JSON.stringify([{
