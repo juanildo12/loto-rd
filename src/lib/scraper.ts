@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { DrawData, GameType } from '@/types/loto';
 
-const BASE_URL = 'https://www.yelu.do/leidsa/results';
+const BASE_URL = 'https://www.yelu.do';
 
 interface ParsedDraw {
   date: string;
@@ -14,42 +14,51 @@ interface ParsedDraw {
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
     },
+    next: { revalidate: 60 }
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch: ${response.status}`);
   }
 
   return response.text();
 }
 
-function parseGameType(gameTypeStr: string): GameType {
-  const type = gameTypeStr.toLowerCase();
-  if (type.includes('mas') && !type.includes('super')) return 'MAS';
-  if (type.includes('super')) return 'SUPERMAS';
-  return 'LOTO';
-}
-
-function parseNumbers(text: string): number[] {
+function parseNumbersFromTitle(title: string): number[] {
   const numbers: number[] = [];
-  const matches = text.match(/\d+/g);
-  if (matches) {
-    matches.forEach((m) => {
-      const num = parseInt(m, 10);
-      if (num >= 1 && num <= 40 && !numbers.includes(num)) {
-        numbers.push(num);
-      } else if (num >= 1 && num <= 15 && numbers.length >= 6 && numbers.length <= 7) {
-        if (!numbers.includes(num)) {
-          numbers.push(num);
-        }
-      }
-    });
+  const cleanTitle = title.replace(/[-+]/, '-');
+  const parts = cleanTitle.split('-');
+  
+  for (const part of parts) {
+    const num = parseInt(part.trim(), 10);
+    if (num >= 1 && num <= 40 && !numbers.includes(num)) {
+      numbers.push(num);
+    }
   }
   return numbers;
+}
+
+function parseDate(dateStr: string): string | null {
+  const monthNames: Record<string, number> = {
+    'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3,
+    'mayo': 4, 'junio': 5, 'julio': 6, 'agosto': 7,
+    'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
+  };
+  
+  const match = dateStr.match(/(\d+)\s+de\s+(\w+)\s+(\d{4})/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = monthNames[match[2].toLowerCase()];
+    const year = parseInt(match[3], 10);
+    if (month !== undefined) {
+      const date = new Date(year, month, day);
+      return date.toISOString().split('T')[0];
+    }
+  }
+  return null;
 }
 
 export async function scrapeLotoResults(
@@ -59,66 +68,57 @@ export async function scrapeLotoResults(
 ): Promise<ParsedDraw[]> {
   const results: ParsedDraw[] = [];
   
-  const gameMap: Record<GameType, string> = {
-    LOTO: 'loto',
-    MAS: 'loto-mas',
-    SUPERMAS: 'loto-mas',
+  const gamePaths: Record<GameType, string> = {
+    LOTO: '/leidsa/results/loto',
+    MAS: '/leidsa/results/loto-mas',
+    SUPERMAS: '/leidsa/results/loto-mas',
   };
 
-  const url = `${BASE_URL}/${gameMap[gameType]}?month=${year}-${String(month).padStart(2, '0')}`;
+  const url = `${BASE_URL}${gamePaths[gameType]}?month=${year}-${String(month).padStart(2, '0')}`;
   
   try {
     const html = await fetchPage(url);
     const $ = cheerio.load(html);
 
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-
-    $('tbody tr, .result-row, .draw-row').each((_, row) => {
+    $('tr').each((_, row) => {
       const $row = $(row);
-      const dateText = $row.find('td:first-child, .date, .draw-date').text().trim();
-      const numbersText = $row.find('td:nth-child(2), .numbers, .draw-numbers').text().trim();
-      const prizeText = $row.find('.prize, .monto').text().trim();
-
-      if (dateText && numbersText) {
-        const numbers = parseNumbers(numbersText);
+      const $dateCell = $row.find('td[title="Fecha del Sorteo"]');
+      const $numbersCell = $row.find('td[title="Números Ganadores"] span');
+      
+      if ($dateCell.length && $numbersCell.length) {
+        const dateText = $dateCell.text().trim();
+        const titleAttr = $numbersCell.attr('title') || '';
         
-        let parsedDate: Date | null = null;
-        
-        // Try to parse various date formats
-        const dateMatch = dateText.match(/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/);
-        if (dateMatch) {
-          const day = parseInt(dateMatch[1]);
-          const monthName = dateMatch[2];
-          const yearNum = parseInt(dateMatch[3]);
-          const monthIndex = monthNames.findIndex(m => 
-            m.toLowerCase() === monthName.toLowerCase()
-          );
-          if (monthIndex !== -1) {
-            parsedDate = new Date(yearNum, monthIndex, day);
+        if (dateText && titleAttr) {
+          const parsedDate = parseDate(dateText);
+          const numbers = parseNumbersFromTitle(titleAttr);
+          
+          if (parsedDate && numbers.length >= 6) {
+            let bonus: number | undefined;
+            let bonus2: number | undefined;
+            
+            const titleParts = titleAttr.split('+');
+            if (titleParts.length >= 2) {
+              const bonusStr = titleParts[1].trim();
+              if (gameType === 'MAS') {
+                bonus = parseInt(bonusStr, 10);
+              } else if (gameType === 'SUPERMAS') {
+                const bonusParts = bonusStr.split('-');
+                bonus = parseInt(bonusParts[0], 10);
+                if (bonusParts.length >= 2) {
+                  bonus2 = parseInt(bonusParts[1], 10);
+                }
+              }
+            }
+
+            results.push({
+              date: parsedDate,
+              numbers: numbers.slice(0, 6),
+              bonus,
+              bonus2,
+              gameType,
+            });
           }
-        }
-
-        if (parsedDate && numbers.length >= 6) {
-          let bonus: number | undefined;
-          let bonus2: number | undefined;
-
-          if (gameType === 'MAS' && numbers.length >= 7) {
-            bonus = numbers[6];
-          } else if (gameType === 'SUPERMAS' && numbers.length >= 8) {
-            bonus = numbers[6];
-            bonus2 = numbers[7];
-          }
-
-          const prize = prizeText ? parseFloat(prizeText.replace(/[RD$\s.,]/g, '')) / 1000000 : undefined;
-
-          results.push({
-            date: parsedDate.toISOString().split('T')[0],
-            numbers: numbers.slice(0, 6),
-            bonus,
-            bonus2,
-            gameType,
-          });
         }
       }
     });
