@@ -1,35 +1,21 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { getDraws, createDraw } from '@/lib/supabase';
 import type { GameType } from '@/types/loto';
 
 export async function GET(request: Request) {
   try {
-    // Debug: log the database URL (masked)
-    const dbUrl = process.env.DATABASE_URL || 'NOT SET';
-    const maskedUrl = dbUrl.replace(/:([^@]+)@/, ':***@');
-    console.log('DATABASE_URL:', maskedUrl);
-    
     const { searchParams } = new URL(request.url);
     const gameType = searchParams.get('gameType') as GameType | null;
     const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
 
-    const draws = await prisma.draw.findMany({
-      where: gameType ? { gameType } : undefined,
-      orderBy: { date: 'desc' },
-      take: limit,
-      skip: offset,
-    });
+    const draws = await getDraws(gameType || undefined, limit);
 
-    const formatedDraws = draws.map((draw) => ({
+    const formatedDraws = draws.map((draw: any) => ({
       ...draw,
       numbers: typeof draw.numbers === 'string' ? JSON.parse(draw.numbers) : draw.numbers,
     }));
 
-    return NextResponse.json({
-      draws: formatedDraws,
-      debug: { dbUrl: maskedUrl, count: draws.length }
-    });
+    return NextResponse.json(formatedDraws);
   } catch (error) {
     console.error('Error fetching draws:', error);
     return NextResponse.json(
@@ -51,30 +37,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const draw = await prisma.draw.upsert({
-      where: {
-        date_gameType: {
-          date: new Date(date),
-          gameType,
-        },
-      },
-      update: {
-        numbers: JSON.stringify(numbers),
-        bonus,
-        bonus2,
-        prize,
-      },
-      create: {
-        date: new Date(date),
-        gameType,
-        numbers: JSON.stringify(numbers),
-        bonus,
-        bonus2,
-        prize,
-      },
-    });
+    const result = await createDraw({ date, gameType, numbers, bonus, bonus2 });
 
-    return NextResponse.json(draw);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error creating draw:', error);
     return NextResponse.json(

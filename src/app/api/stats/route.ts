@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { getDraws } from '@/lib/supabase';
 import { getStatistics, getNumberFrequencyList } from '@/lib/statistics';
 import type { GameType } from '@/types/loto';
 
@@ -9,17 +9,11 @@ export async function GET(request: Request) {
     const gameType = searchParams.get('gameType') as GameType | null;
     const limit = parseInt(searchParams.get('limit') || '200');
 
-    const draws = await prisma.draw.findMany({
-      where: gameType ? { gameType } : undefined,
-      orderBy: { date: 'desc' },
-      take: limit,
-    });
+    const draws = await getDraws(gameType || undefined, limit);
 
-    const formatedDraws = draws.map((draw) => ({
+    const formatedDraws = draws.map((draw: any) => ({
       ...draw,
-      date: draw.date.toISOString(),
-      createdAt: draw.createdAt.toISOString(),
-      updatedAt: draw.updatedAt.toISOString(),
+      date: new Date(draw.date).toISOString(),
       numbers: typeof draw.numbers === 'string' ? JSON.parse(draw.numbers) : draw.numbers,
     }));
 
@@ -33,7 +27,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error fetching statistics:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch statistics' },
+      { error: 'Failed to fetch statistics', details: String(error) },
       { status: 500 }
     );
   }
