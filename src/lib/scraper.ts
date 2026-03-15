@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
-import type { DrawData, GameType } from '@/types/loto';
+import type { GameType } from '@/types/loto';
 
-const BASE_URL = 'https://www.yelu.do';
+const BASE_URL = 'https://enloteria.com';
 
 interface ParsedDraw {
   date: string;
@@ -27,101 +27,75 @@ async function fetchPage(url: string): Promise<string> {
   return response.text();
 }
 
-function parseNumbersFromTitle(title: string): number[] {
+function extractNumbersFromDescription(description: string): number[] {
   const numbers: number[] = [];
-  const cleanTitle = title.replace(/[-+]/, '-');
-  const parts = cleanTitle.split('-');
-  
-  for (const part of parts) {
-    const num = parseInt(part.trim(), 10);
-    if (num >= 1 && num <= 40 && !numbers.includes(num)) {
-      numbers.push(num);
+  const matches = description.match(/\d+/g);
+  if (matches) {
+    for (const m of matches) {
+      const num = parseInt(m, 10);
+      if (num >= 1 && num <= 40 && !numbers.includes(num)) {
+        numbers.push(num);
+      }
     }
   }
-  return numbers;
+  return numbers.slice(0, 6);
 }
 
-function parseDate(dateStr: string): string | null {
-  const monthNames: Record<string, number> = {
-    'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3,
-    'mayo': 4, 'junio': 5, 'julio': 6, 'agosto': 7,
-    'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
-  };
-  
-  const match = dateStr.match(/(\d+)\s+de\s+(\w+)\s+(\d{4})/);
+function parseDateFromUrl(url: string): string | null {
+  const match = url.match(/resultados-loto(?:-mas)?-(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
-    const day = parseInt(match[1], 10);
-    const month = monthNames[match[2].toLowerCase()];
-    const year = parseInt(match[3], 10);
-    if (month !== undefined) {
-      const date = new Date(year, month, day);
-      return date.toISOString().split('T')[0];
-    }
+    return `${match[1]}-${match[2]}-${match[3]}`;
   }
   return null;
 }
 
-export async function scrapeLotoResults(
-  year: number,
-  month: number,
-  gameType: GameType = 'LOTO'
-): Promise<ParsedDraw[]> {
+export async function scrapeLotoResults(gameType: GameType = 'LOTO'): Promise<ParsedDraw[]> {
   const results: ParsedDraw[] = [];
   
   const gamePaths: Record<GameType, string> = {
-    LOTO: '/leidsa/results/loto',
-    MAS: '/leidsa/results/loto-mas',
-    SUPERMAS: '/leidsa/results/loto-mas',
+    LOTO: '/resultados-loto',
+    MAS: '/resultados-loto-mas',
+    SUPERMAS: '/resultados-loto-mas',
   };
 
-  const url = `${BASE_URL}${gamePaths[gameType]}?month=${year}-${String(month).padStart(2, '0')}`;
+  const url = `${BASE_URL}${gamePaths[gameType]}`;
   
   try {
     const html = await fetchPage(url);
     const $ = cheerio.load(html);
 
-    $('tr').each((_, row) => {
-      const $row = $(row);
-      const $dateCell = $row.find('td[title="Fecha del Sorteo"]');
-      const $numbersCell = $row.find('td[title="Números Ganadores"] span');
-      
-      if ($dateCell.length && $numbersCell.length) {
-        const dateText = $dateCell.text().trim();
-        const titleAttr = $numbersCell.attr('title') || '';
+    const scriptTags = $('script[type="application/ld+json"]');
+    
+    scriptTags.each((_, el) => {
+      try {
+        const jsonContent = $(el).html();
+        if (!jsonContent) return;
         
-        if (dateText && titleAttr) {
-          const parsedDate = parseDate(dateText);
-          const numbers = parseNumbersFromTitle(titleAttr);
-          
-          if (parsedDate && numbers.length >= 6) {
-            let bonus: number | undefined;
-            let bonus2: number | undefined;
+        const data = JSON.parse(jsonContent);
+        const events = Array.isArray(data) ? data : (data['@graph'] || [data]);
+        
+        for (const event of events) {
+          if (event['@type'] === 'Event' && event.name?.includes('Loto')) {
+            const url = event.url;
+            const description = event.description || '';
+            const numbers = extractNumbersFromDescription(description);
             
-            const titleParts = titleAttr.split('+');
-            if (titleParts.length >= 2) {
-              const bonusStr = titleParts[1].trim();
-              if (gameType === 'MAS') {
-                bonus = parseInt(bonusStr, 10);
-              } else if (gameType === 'SUPERMAS') {
-                const bonusParts = bonusStr.split('-');
-                bonus = parseInt(bonusParts[0], 10);
-                if (bonusParts.length >= 2) {
-                  bonus2 = parseInt(bonusParts[1], 10);
-                }
-              }
+            const date = parseDateFromUrl(url);
+            
+            if (date && numbers.length >= 6) {
+              results.push({
+                date,
+                numbers,
+                gameType,
+              });
             }
-
-            results.push({
-              date: parsedDate,
-              numbers: numbers.slice(0, 6),
-              bonus,
-              bonus2,
-              gameType,
-            });
           }
         }
+      } catch (e) {
+        // Skip invalid JSON
       }
     });
+
   } catch (error) {
     console.error(`Error scraping ${url}:`, error);
   }
@@ -129,17 +103,14 @@ export async function scrapeLotoResults(
   return results;
 }
 
-export async function scrapeAllResults(
-  year: number,
-  month: number
-): Promise<ParsedDraw[]> {
+export async function scrapeAllResults(): Promise<ParsedDraw[]> {
   const allResults: ParsedDraw[] = [];
   
   const gameTypes: GameType[] = ['LOTO', 'MAS'];
   
   for (const gameType of gameTypes) {
     try {
-      const results = await scrapeLotoResults(year, month, gameType);
+      const results = await scrapeLotoResults(gameType);
       allResults.push(...results);
     } catch (error) {
       console.error(`Error scraping ${gameType}:`, error);

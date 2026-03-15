@@ -45,7 +45,9 @@ interface DrawCardProps {
 
 export function DrawCard({ date, gameType, numbers, bonus, bonus2 }: DrawCardProps) {
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const datePart = dateStr.split('T')[0];
+    const [year, month, day] = datePart.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     return date.toLocaleDateString('es-DO', {
       day: '2-digit',
       month: 'short',
