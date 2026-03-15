@@ -16,7 +16,7 @@ interface Draw {
 export default function ResultadosPage() {
   const [draws, setDraws] = useState<Draw[]>([]);
   const [loading, setLoading] = useState(true);
-  const [gameType, setGameType] = useState<string>('all');
+  const [gameType, setGameType] = useState<string>('MAS');
   const [scraping, setScraping] = useState(false);
 
   const fetchDraws = async () => {
@@ -74,8 +74,7 @@ export default function ResultadosPage() {
               className="border-none bg-transparent text-sm focus:outline-none"
             >
               <option value="all">Todos</option>
-              <option value="LOTO">Loto</option>
-              <option value="MAS">MAS</option>
+              <option value="MAS">LOTO MAS</option>
               <option value="SUPERMAS">Supermas</option>
             </select>
           </div>

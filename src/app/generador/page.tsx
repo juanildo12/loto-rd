@@ -18,7 +18,7 @@ const strategies = [
 
 export default function GeneradorPage() {
   const [strategy, setStrategy] = useState('random');
-  const [gameType, setGameType] = useState('LOTO');
+  const [gameType, setGameType] = useState('MAS');
   const [count, setCount] = useState(1);
   const [combinations, setCombinations] = useState<Combination[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,9 +65,8 @@ export default function GeneradorPage() {
               onChange={(e) => setGameType(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
-              <option value="LOTO">Loto (6 números del 1-40)</option>
-              <option value="MAS">MAS (6 + Bono)</option>
-              <option value="SUPERMAS">Supermas (6 + 2 Bonos)</option>
+              <option value="MAS">LOTO MAS (6 números + Bono)</option>
+              <option value="SUPERMAS">Supermas (6 números + 2 Bonos)</option>
             </select>
           </div>
 

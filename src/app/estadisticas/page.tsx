@@ -36,7 +36,7 @@ export default function EstadisticasPage() {
   const [stats, setStats] = useState<Statistics | null>(null);
   const [frequencies, setFrequencies] = useState<FrequencyData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [gameType, setGameType] = useState<string>('LOTO');
+  const [gameType, setGameType] = useState<string>('MAS');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -84,8 +84,7 @@ export default function EstadisticasPage() {
           onChange={(e) => setGameType(e.target.value)}
           className="bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
-          <option value="LOTO">Loto</option>
-          <option value="MAS">MAS</option>
+          <option value="MAS">LOTO MAS</option>
           <option value="SUPERMAS">Supermas</option>
         </select>
       </div>
